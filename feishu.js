@@ -7,15 +7,14 @@ app.use(express.json());
 
 // 初始化 OpenAI 客户端
 const openai = new OpenAI({
-  apiKey:
-    "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",
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 // 飞书应用配置（从飞书开放平台获取）
 const FEISHU_CONFIG = {
-  appId: "cli_a939426a23789cc6",
-  appSecret: "VOAUhAvgGdGSo1un87XNne725jMkkPIx",
-  verificationToken: "YXKk6bE44gVGphuPETsViuklSVhWnJZE",
+  appId: process.env.FEISHU_APP_ID,
+  appSecret: process.env.FEISHU_APP_SECRET,
+  verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
 };
 
 // 1. 飞书事件接收接口

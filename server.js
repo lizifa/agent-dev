@@ -1,25 +1,27 @@
+require("dotenv").config();
 const axios = require("axios");
 const schedule = require("node-schedule");
 const express = require("express");
 const { DateTime } = require("luxon");
 const crypto = require("crypto");
 
-// ===================== 所有配置项 =====================
+// ===================== 所有配置项（关键信息从环境变量读取） =====================
 const CONFIG = {
   // 群机器人 Webhook（仅发送、定时推送）
-  FEISHU_WEBHOOK:
-    "https://open.feishu.cn/open-apis/bot/v2/hook/ba101f68-3221-4108-9534-59d5bbacf065",
-  FEISHU_SIGN_SECRET: "9zLkUzBp2DczKJ3UmCJ6ed", // 去掉空格
+  FEISHU_WEBHOOK: process.env.FEISHU_WEBHOOK || "",
+  FEISHU_SIGN_SECRET: process.env.FEISHU_SIGN_SECRET || "",
   // 企业自建应用（用于 @ 机器人 回复消息），未配置则无法回复 @
   FEISHU_APP_ID: process.env.FEISHU_APP_ID || "",
   FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET || "",
   EVENT_PORT: parseInt(process.env.EVENT_PORT || "3000", 10),
-  CRON_TIME: "0 0 9 * * *",
+  CRON_TIME: process.env.CRON_TIME || "0 0 9 * * *",
   RN_GITHUB_RELEASE_URL:
+    process.env.RN_GITHUB_RELEASE_URL ||
     "https://api.github.com/repos/facebook/react-native/releases/latest",
-  RN_OFFICIAL_BLOG_URL: "https://reactnative.dev/blog",
-  MSG_TITLE: "React Native每日更新",
-  MAX_SUMMARY_LENGTH: 600,
+  RN_OFFICIAL_BLOG_URL:
+    process.env.RN_OFFICIAL_BLOG_URL || "https://reactnative.dev/blog",
+  MSG_TITLE: process.env.MSG_TITLE || "React Native每日更新",
+  MAX_SUMMARY_LENGTH: parseInt(process.env.MAX_SUMMARY_LENGTH || "600", 10),
 };
 // =====================================================
 
@@ -220,19 +222,32 @@ async function sendToFeishu(content) {
         `✅ 推送成功（无签名）：${DateTime.now().toFormat("yyyy-MM-dd HH:mm:ss")}`,
       );
     } else {
+      const d = res.data || {};
       console.error(
-        "❌ 飞书返回异常：",
+        "❌ 飞书 Webhook 返回异常：",
+        "status=",
         res.status,
-        res.data || res.statusText,
+        "code=",
+        d.code ?? d.StatusCode,
+        "msg=",
+        d.msg ?? d.StatusMessage ?? res.statusText,
+        "body=",
+        JSON.stringify(d),
       );
       if (res.data?.code === 19021) {
         console.error(
-          "💡 请检查：1) 在飞书群机器人设置里重新复制「签名校验」密钥；2) 本机时间是否准确（与网络时间同步）。",
+          "💡 签名校验失败：1) 在飞书群机器人设置里重新复制「签名校验」密钥；2) 本机时间是否与网络时间同步。",
         );
+      }
+      if (res.data?.code === 19001) {
+        console.error("💡 参数错误：请检查 FEISHU_WEBHOOK 地址是否正确。");
       }
     }
   } catch (err) {
     console.error(`❌ 推送失败：${err.message}`);
+    if (err.code === "ECONNREFUSED" || err.code === "ENOTFOUND") {
+      console.error("💡 网络不可达，请检查本机网络或代理。");
+    }
     if (err.response) console.error("❌ 飞书错误响应：", err.response.data);
   }
 }
@@ -315,7 +330,11 @@ const job = schedule.scheduleJob(CONFIG.CRON_TIME, runTask);
 
 console.log(`🚀 RN飞书机器人已启动！`);
 console.log(`🔧 定时规则：${CONFIG.CRON_TIME}`);
-// 用 job 实例获取下次执行时间
 console.log(
   `📅 下次执行时间：${job.nextInvocation()?.toLocaleString() || "立即执行"}`,
 );
+if (!CONFIG.FEISHU_APP_ID || !CONFIG.FEISHU_APP_SECRET) {
+  console.warn(
+    "⚠️ 未配置 FEISHU_APP_ID/FEISHU_APP_SECRET，@ 机器人 回复功能不可用；需在飞书开放平台创建自建应用并配置环境变量。",
+  );
+}
