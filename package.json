@@ -1,0 +1,28 @@
+{
+  "name": "agent-dev",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lizifa/agent-dev.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lizifa/agent-dev/issues"
+  },
+  "homepage": "https://github.com/lizifa/agent-dev#readme",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "dotenv": "^17.3.1",
+    "express": "^4.22.1",
+    "luxon": "^3.7.2",
+    "node-schedule": "^2.1.1",
+    "openai": "^6.27.0"
+  }
+}
