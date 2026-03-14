@@ -19,6 +19,10 @@ const FEISHU_CONFIG = {
 
 // 1. 飞书事件接收接口
 app.post("/feishu/webhook", async (req, res) => {
+  // 任何 POST 都打一条，确认请求是否到达本服务
+  const eventType = req.body?.header?.event_type ?? req.body?.type ?? "(无)";
+  console.log("[feishu] 收到请求 event_type/type:", eventType);
+
   const { header, event } = req.body;
 
   // 飞书 URL 验证（首次配置必须）— 兼容两种格式并返回 challenge
@@ -32,8 +36,12 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.json({ challenge });
   }
 
-  // 只处理消息事件，其它事件直接确认
-  if (header?.event_type !== "im.message.receive_v1") {
+  // 只处理消息事件（兼容 v1 / v2.0），其它事件直接确认
+  const isMessageEvent =
+    header?.event_type === "im.message.receive_v1" ||
+    header?.event_type === "im.message.receive_v2";
+  if (!isMessageEvent) {
+    console.log("[feishu] 非消息事件，已忽略:", header?.event_type);
     return res.status(200).json({});
   }
 
