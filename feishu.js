@@ -48,20 +48,10 @@ app.post("/feishu/webhook", async (req, res) => {
   if (!isMentioned) return res.status(200).json({});
 
   try {
-    // 2. 调用 OpenAI 生成回复
-    const gptResponse = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "你是「小书包」，一个友好的飞书智能助手，回答简洁有趣。",
-        },
-        { role: "user", content: userInput },
-      ],
-    });
-    const reply = gptResponse.choices[0].message.content.trim();
+    // 先随便回复一句话
+    const reply = "你好呀，我是小书包～有啥想问的？";
 
-    // 3. 调用飞书 API 回复消息
+    // 调用飞书 API 回复消息
     await sendFeishuReply(message_id, reply);
     res.status(200).json({});
   } catch (error) {
