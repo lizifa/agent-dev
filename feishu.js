@@ -1,125 +1,99 @@
+require("dotenv").config();
 const express = require("express");
 const axios = require("axios");
-const { OpenAI } = require("openai");
-
 const app = express();
 app.use(express.json());
 
-// 初始化 OpenAI 客户端
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// 飞书应用配置（从飞书开放平台获取）
-const FEISHU_CONFIG = {
-  appId: process.env.FEISHU_APP_ID,
-  appSecret: process.env.FEISHU_APP_SECRET,
-  verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
+// 配置项：替换成你的信息
+const CONFIG = {
+  FEISHU_APP_ID: process.env.FEISHU_APP_ID,
+  FEISHU_APP_SECRET: process.env.FEISHU_APP_SECRET,
+  BOT_NAME: "小书包", // 你的机器人名称
+  TARGET_USER_NAME: "张三", // 你要筛选的指定用户名称（或用户ID）
+  // 也可以用用户ID（更精准，避免重名）：TARGET_USER_ID: 'ou_xxxxxx'
 };
 
-// 1. 飞书事件接收接口
-// 若始终没有 [feishu] 收到请求 日志：说明请求没打到本服务，请检查 ① 事件配置请求地址是否为 https://xxb.dokichat.club/feishu/webhook ② 公网转发是否指向运行本文件的进程（如 pm2 feishu）
+// 飞书事件接收接口
 app.post("/feishu/webhook", async (req, res) => {
-  const eventType =
-    req.body?.header?.event_type ??
-    req.body?.event?.type ??
-    req.body?.type ??
-    "(无)";
-  console.log("[feishu] 收到请求 event_type/type:", eventType);
+  const { header, event, challenge } = req.body;
 
-  const { header, event } = req.body;
-
-  // 飞书 URL 验证（首次配置必须）
-  const isUrlVerification =
-    req.body?.type === "url_verification" ||
-    header?.event_type === "url_verification";
-  const challenge = req.body?.challenge;
-  if (isUrlVerification && challenge != null) {
+  // 1. 处理飞书URL验证
+  if (header?.event_type === "url_verification") {
     return res.json({ challenge });
   }
 
-  // 消息事件：兼容两种推送格式
-  // 格式A: { header: { event_type: "im.message.receive_v1" }, event: { message } }
-  // 格式B: { type: "event_callback", event: { type: "im.message.receive_v1", message } }
-  const msgEventType = header?.event_type ?? req.body?.event?.type;
-  const isMessageEvent =
-    msgEventType === "im.message.receive_v1" ||
-    msgEventType === "im.message.receive_v2";
-  if (!isMessageEvent) {
-    console.log("[feishu] 非消息事件，已忽略:", msgEventType);
-    return res.status(200).json({});
-  }
-
-  console.log("[feishu] 收到消息事件:", JSON.stringify(req.body, null, 2));
-
-  const eventBody = req.body?.event;
-  const message = eventBody?.message;
-  if (!message) {
-    console.warn("[feishu] 无 event.message，跳过");
-    return res.status(200).json({});
-  }
-
-  const { message_id, content, mentions, chat_type } = message;
-  let userInput = "";
-  try {
-    userInput =
-      typeof content === "string"
-        ? JSON.parse(content).text
-        : (content?.text ?? "");
-  } catch (e) {
-    console.warn("[feishu] 解析 content 失败:", content);
-    return res.status(200).json({});
-  }
-
-  // 单聊（p2p）：每条消息都回复；群聊：仅在被 @「小书包」时回复
-  const isP2p = chat_type === "p2p";
-  const isMentioned = mentions?.some(
-    (m) => m.name && m.name.includes("小书包"),
-  );
-  if (!isP2p && !isMentioned) {
-    return res.status(200).json({});
+  // 2. 只处理消息接收事件
+  if (header?.event_type !== "im.message.receive_v1") {
+    return res.send("ok");
   }
 
   try {
-    // 先随便回复一句话
-    const reply = "你好呀，我是小书包～有啥想问的？";
+    // 3. 解析消息核心数据
+    const { message, sender } = event;
+    const content = JSON.parse(message.content); // 消息内容JSON
+    const rawText = content.text; // 原始消息文本（含@符号）
+    const mentions = message.mentions || []; // @列表
+    const senderName = sender.sender_id.union_id
+      ? sender.sender_id.union_id // 用户唯一ID（推荐）
+      : sender.sender_name; // 用户名（易重名）
 
-    // 调用飞书 API 回复消息
-    await sendFeishuReply(message_id, reply);
-    res.status(200).json({});
+    // 4. 核心判断：是否是指定用户@了你的机器人
+    // 4.1 判断是否@了机器人
+    const isAtBot = mentions.some(
+      (mention) => mention.name === CONFIG.BOT_NAME,
+    );
+    // 4.2 判断是否是指定用户发送的
+    const isTargetUser = senderName === CONFIG.TARGET_USER_NAME;
+    // 若用用户ID判断：isTargetUser = sender.sender_id.user_id === CONFIG.TARGET_USER_ID;
+
+    // 5. 仅处理「指定用户@机器人」的消息
+    if (isAtBot && isTargetUser) {
+      // 提取纯文本（去掉@机器人的部分，只保留用户真正说的话）
+      const pureText = rawText.replace(/@[^ ]+/g, "").trim();
+      console.log(`【指定用户@我】${CONFIG.TARGET_USER_NAME}说：${pureText}`);
+
+      // 可选：回复该用户
+      await replyToMessage(message.message_id, `收到啦！你说的是：${pureText}`);
+    }
+
+    res.send("ok");
   } catch (error) {
-    console.error("处理失败:", error);
-    res.status(500).json({ error: "internal error" });
+    console.error("处理消息失败：", error);
+    res.status(200).send("ok"); // 飞书要求必须返回200，否则会重试
   }
 });
 
-// 飞书「回复消息」接口（群聊/单聊都用此接口，不能把 message_id 当 receive_id 发新消息）
-async function sendFeishuReply(messageId, text) {
+// 回复消息的工具函数
+async function replyToMessage(messageId, replyContent) {
+  // 获取飞书token
   const tokenRes = await axios.post(
     "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
-    { app_id: FEISHU_CONFIG.appId, app_secret: FEISHU_CONFIG.appSecret },
+    {
+      app_id: CONFIG.FEISHU_APP_ID,
+      app_secret: CONFIG.FEISHU_APP_SECRET,
+    },
   );
   const accessToken = tokenRes.data.tenant_access_token;
 
-  const url = `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/reply`;
-  try {
-    const res = await axios.post(
-      url,
-      {
-        msg_type: "text",
-        content: JSON.stringify({ text }),
+  // 发送回复
+  await axios.post(
+    "https://open.feishu.cn/open-apis/im/v1/messages",
+    {
+      receive_id: messageId,
+      msg_type: "text",
+      content: JSON.stringify({ text: replyContent }),
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    console.log("[feishu] 回复成功:", res.data?.data?.message_id ?? res.data);
-  } catch (err) {
-    console.error("[feishu] 回复失败:", err.response?.data ?? err.message);
-    throw err;
-  }
+    },
+  );
 }
 
 // 启动服务
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`小书包机器人服务运行在11 http://localhost:${PORT}`);
+  console.log(`服务运行在端口 ${PORT}`);
 });
