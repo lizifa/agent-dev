@@ -20,7 +20,11 @@ const FEISHU_CONFIG = {
 // 1. 飞书事件接收接口
 // 若始终没有 [feishu] 收到请求 日志：说明请求没打到本服务，请检查 ① 事件配置请求地址是否为 https://xxb.dokichat.club/feishu/webhook ② 公网转发是否指向运行本文件的进程（如 pm2 feishu）
 app.post("/feishu/webhook", async (req, res) => {
-  const eventType = req.body?.header?.event_type ?? req.body?.event?.type ?? req.body?.type ?? "(无)";
+  const eventType =
+    req.body?.header?.event_type ??
+    req.body?.event?.type ??
+    req.body?.type ??
+    "(无)";
   console.log("[feishu] 收到请求 event_type/type:", eventType);
 
   const { header, event } = req.body;
@@ -58,7 +62,10 @@ app.post("/feishu/webhook", async (req, res) => {
   const { message_id, content, mentions, chat_type } = message;
   let userInput = "";
   try {
-    userInput = typeof content === "string" ? JSON.parse(content).text : content?.text ?? "";
+    userInput =
+      typeof content === "string"
+        ? JSON.parse(content).text
+        : (content?.text ?? "");
   } catch (e) {
     console.warn("[feishu] 解析 content 失败:", content);
     return res.status(200).json({});
@@ -66,7 +73,9 @@ app.post("/feishu/webhook", async (req, res) => {
 
   // 单聊（p2p）：每条消息都回复；群聊：仅在被 @「小书包」时回复
   const isP2p = chat_type === "p2p";
-  const isMentioned = mentions?.some((m) => m.name && m.name.includes("小书包"));
+  const isMentioned = mentions?.some(
+    (m) => m.name && m.name.includes("小书包"),
+  );
   if (!isP2p && !isMentioned) {
     return res.status(200).json({});
   }
@@ -112,5 +121,5 @@ async function sendFeishuReply(messageId, text) {
 // 启动服务
 const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`小书包机器人服务运行在 http://localhost:${PORT}`);
+  console.log(`小书包机器人服务运行在11 http://localhost:${PORT}`);
 });
