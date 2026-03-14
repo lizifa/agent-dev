@@ -18,6 +18,7 @@
   "homepage": "https://github.com/lizifa/agent-dev#readme",
   "description": "",
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.59.0",
     "axios": "^1.13.6",
     "dotenv": "^17.3.1",
     "express": "^4.22.1",
