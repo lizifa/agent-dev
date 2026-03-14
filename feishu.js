@@ -20,18 +20,18 @@ const FEISHU_CONFIG = {
 // 1. 飞书事件接收接口
 app.post("/feishu/webhook", async (req, res) => {
   const { header, event } = req.body;
-  console.log(header, event);
-  return res.status(200).send("ok");
 
-  // 飞书 URL 验证（首次配置必须）
-  if (header.event_type === "url_verification") {
+  // 飞书 URL 验证（首次配置必须）— 必须返回 JSON
+  if (header?.event_type === "url_verification") {
     return res.json({ challenge: req.body.challenge });
   }
 
-  // 只处理消息事件
-  if (header.event_type !== "im.message.receive_v1") {
-    return res.status(200).send("ok");
+  // 只处理消息事件，其它事件直接确认
+  if (header?.event_type !== "im.message.receive_v1") {
+    return res.status(200).json({});
   }
+
+  console.log(header, event);
 
   // 提取消息内容
   const { message_id, content, mentions } = event.message;
@@ -39,7 +39,7 @@ app.post("/feishu/webhook", async (req, res) => {
 
   // 只在被 @「小书包」时回复
   const isMentioned = mentions?.some((m) => m.name.includes("小书包"));
-  if (!isMentioned) return res.status(200).send("ok");
+  if (!isMentioned) return res.status(200).json({});
 
   try {
     // 2. 调用 OpenAI 生成回复
@@ -57,10 +57,10 @@ app.post("/feishu/webhook", async (req, res) => {
 
     // 3. 调用飞书 API 回复消息
     await sendFeishuReply(message_id, reply);
-    res.status(200).send("ok");
+    res.status(200).json({});
   } catch (error) {
     console.error("处理失败:", error);
-    res.status(500).send("error");
+    res.status(500).json({ error: "internal error" });
   }
 });
 
