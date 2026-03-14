@@ -18,16 +18,14 @@ const FEISHU_CONFIG = {
 };
 
 // 1. 飞书事件接收接口
+// 若始终没有 [feishu] 收到请求 日志：说明请求没打到本服务，请检查 ① 事件配置请求地址是否为 https://xxb.dokichat.club/feishu/webhook ② 公网转发是否指向运行本文件的进程（如 pm2 feishu）
 app.post("/feishu/webhook", async (req, res) => {
-  // 任何 POST 都打一条，确认请求是否到达本服务
-  const eventType = req.body?.header?.event_type ?? req.body?.type ?? "(无)";
+  const eventType = req.body?.header?.event_type ?? req.body?.event?.type ?? req.body?.type ?? "(无)";
   console.log("[feishu] 收到请求 event_type/type:", eventType);
 
   const { header, event } = req.body;
 
-  // 飞书 URL 验证（首次配置必须）— 兼容两种格式并返回 challenge
-  // 格式1：配置请求地址时，body 顶层为 { type: "url_verification", challenge: "xxx", token: "xxx" }
-  // 格式2：事件订阅验证时，body 为 { header: { event_type: "url_verification" }, challenge: "xxx" }
+  // 飞书 URL 验证（首次配置必须）
   const isUrlVerification =
     req.body?.type === "url_verification" ||
     header?.event_type === "url_verification";
@@ -36,16 +34,18 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.json({ challenge });
   }
 
-  // 只处理消息事件（兼容 v1 / v2.0），其它事件直接确认
+  // 消息事件：兼容两种推送格式
+  // 格式A: { header: { event_type: "im.message.receive_v1" }, event: { message } }
+  // 格式B: { type: "event_callback", event: { type: "im.message.receive_v1", message } }
+  const msgEventType = header?.event_type ?? req.body?.event?.type;
   const isMessageEvent =
-    header?.event_type === "im.message.receive_v1" ||
-    header?.event_type === "im.message.receive_v2";
+    msgEventType === "im.message.receive_v1" ||
+    msgEventType === "im.message.receive_v2";
   if (!isMessageEvent) {
-    console.log("[feishu] 非消息事件，已忽略:", header?.event_type);
+    console.log("[feishu] 非消息事件，已忽略:", msgEventType);
     return res.status(200).json({});
   }
 
-  // 打完整 body 便于排查（避免 undefined undefined）
   console.log("[feishu] 收到消息事件:", JSON.stringify(req.body, null, 2));
 
   const eventBody = req.body?.event;
