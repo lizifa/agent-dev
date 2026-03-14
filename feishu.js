@@ -6,9 +6,9 @@ const app = express();
 app.use(express.json());
 
 // 初始化 OpenAI 客户端
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// const openai = new OpenAI({
+//   apiKey: process.env.OPENAI_API_KEY,
+// });
 
 // 飞书应用配置
 const FEISHU_CONFIG = {
