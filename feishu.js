@@ -37,15 +37,30 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.status(200).json({});
   }
 
-  console.log(header, event);
+  // 打完整 body 便于排查（避免 undefined undefined）
+  console.log("[feishu] 收到消息事件:", JSON.stringify(req.body, null, 2));
 
-  // 提取消息内容
-  const { message_id, content, mentions } = event.message;
-  const userInput = JSON.parse(content).text;
+  const eventBody = req.body?.event;
+  const message = eventBody?.message;
+  if (!message) {
+    console.warn("[feishu] 无 event.message，跳过");
+    return res.status(200).json({});
+  }
+
+  const { message_id, content, mentions } = message;
+  let userInput = "";
+  try {
+    userInput = typeof content === "string" ? JSON.parse(content).text : content?.text ?? "";
+  } catch (e) {
+    console.warn("[feishu] 解析 content 失败:", content);
+    return res.status(200).json({});
+  }
 
   // 只在被 @「小书包」时回复
-  const isMentioned = mentions?.some((m) => m.name.includes("小书包"));
-  if (!isMentioned) return res.status(200).json({});
+  const isMentioned = mentions?.some((m) => m.name && m.name.includes("小书包"));
+  if (!isMentioned) {
+    return res.status(200).json({});
+  }
 
   try {
     // 先随便回复一句话
@@ -60,25 +75,29 @@ app.post("/feishu/webhook", async (req, res) => {
   }
 });
 
-// 飞书发送消息工具函数
+// 飞书「回复消息」接口（群聊/单聊都用此接口，不能把 message_id 当 receive_id 发新消息）
 async function sendFeishuReply(messageId, text) {
-  // 1. 获取 tenant_access_token
   const tokenRes = await axios.post(
     "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
     { app_id: FEISHU_CONFIG.appId, app_secret: FEISHU_CONFIG.appSecret },
   );
   const accessToken = tokenRes.data.tenant_access_token;
 
-  // 2. 回复消息
-  await axios.post(
-    "https://open.feishu.cn/open-apis/im/v1/messages",
-    {
-      receive_id: messageId,
-      msg_type: "text",
-      content: JSON.stringify({ text }),
-    },
-    { headers: { Authorization: `Bearer ${accessToken}` } },
-  );
+  const url = `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/reply`;
+  try {
+    const res = await axios.post(
+      url,
+      {
+        msg_type: "text",
+        content: JSON.stringify({ text }),
+      },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    console.log("[feishu] 回复成功:", res.data?.data?.message_id ?? res.data);
+  } catch (err) {
+    console.error("[feishu] 回复失败:", err.response?.data ?? err.message);
+    throw err;
+  }
 }
 
 // 启动服务
