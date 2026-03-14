@@ -9,6 +9,7 @@ const eventDispatcher = new lark.EventDispatcher({
   encryptKey: process.env.FEISHU_ENCRYPT_KEY,
 }).register({
   "im.message.receive_v1": async (data) => {
+    console.log(data);
     const chatId = data.message.chat_id;
 
     const res = await client.im.message.create({
