@@ -17,8 +17,6 @@ const FEISHU_CONFIG = {
   verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
 };
 
-// 1. 飞书事件接收接口
-// 若始终没有 [feishu] 收到请求 日志：说明请求没打到本服务，请检查 ① 事件配置请求地址是否为 https://xxb.dokichat.club/feishu/webhook ② 公网转发是否指向运行本文件的进程（如 pm2 feishu）
 app.post("/feishu/webhook", async (req, res) => {
   const eventType =
     req.body?.header?.event_type ??
@@ -38,9 +36,6 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.json({ challenge });
   }
 
-  // 消息事件：兼容两种推送格式
-  // 格式A: { header: { event_type: "im.message.receive_v1" }, event: { message } }
-  // 格式B: { type: "event_callback", event: { type: "im.message.receive_v1", message } }
   const msgEventType = header?.event_type ?? req.body?.event?.type;
   const isMessageEvent =
     msgEventType === "im.message.receive_v1" ||
@@ -50,12 +45,9 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.status(200).json({});
   }
 
-  console.log("[feishu] 收到消息事件:", JSON.stringify(req.body, null, 2));
-
   const eventBody = req.body?.event;
   const message = eventBody?.message;
   if (!message) {
-    console.warn("[feishu] 无 event.message，跳过");
     return res.status(200).json({});
   }
 
@@ -67,7 +59,6 @@ app.post("/feishu/webhook", async (req, res) => {
         ? JSON.parse(content).text
         : (content?.text ?? "");
   } catch (e) {
-    console.warn("[feishu] 解析 content 失败:", content);
     return res.status(200).json({});
   }
 
