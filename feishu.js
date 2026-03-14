@@ -21,9 +21,15 @@ const FEISHU_CONFIG = {
 app.post("/feishu/webhook", async (req, res) => {
   const { header, event } = req.body;
 
-  // 飞书 URL 验证（首次配置必须）— 必须返回 JSON
-  if (header?.event_type === "url_verification") {
-    return res.json({ challenge: req.body.challenge });
+  // 飞书 URL 验证（首次配置必须）— 兼容两种格式并返回 challenge
+  // 格式1：配置请求地址时，body 顶层为 { type: "url_verification", challenge: "xxx", token: "xxx" }
+  // 格式2：事件订阅验证时，body 为 { header: { event_type: "url_verification" }, challenge: "xxx" }
+  const isUrlVerification =
+    req.body?.type === "url_verification" ||
+    header?.event_type === "url_verification";
+  const challenge = req.body?.challenge;
+  if (isUrlVerification && challenge != null) {
+    return res.json({ challenge });
   }
 
   // 只处理消息事件，其它事件直接确认
