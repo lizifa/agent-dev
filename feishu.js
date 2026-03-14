@@ -47,7 +47,7 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.status(200).json({});
   }
 
-  const { message_id, content, mentions } = message;
+  const { message_id, content, mentions, chat_type } = message;
   let userInput = "";
   try {
     userInput = typeof content === "string" ? JSON.parse(content).text : content?.text ?? "";
@@ -56,9 +56,10 @@ app.post("/feishu/webhook", async (req, res) => {
     return res.status(200).json({});
   }
 
-  // 只在被 @「小书包」时回复
+  // 单聊（p2p）：每条消息都回复；群聊：仅在被 @「小书包」时回复
+  const isP2p = chat_type === "p2p";
   const isMentioned = mentions?.some((m) => m.name && m.name.includes("小书包"));
-  if (!isMentioned) {
+  if (!isP2p && !isMentioned) {
     return res.status(200).json({});
   }
 
