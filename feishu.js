@@ -20,6 +20,8 @@ const FEISHU_CONFIG = {
 // 1. 飞书事件接收接口
 app.post("/feishu/webhook", async (req, res) => {
   const { header, event } = req.body;
+  console.log(header, event);
+  return res.status(200).send("ok");
 
   // 飞书 URL 验证（首次配置必须）
   if (header.event_type === "url_verification") {
