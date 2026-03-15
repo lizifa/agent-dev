@@ -1,6 +1,7 @@
 import "dotenv/config";
 // @version 0.0.11 本地无 AC_AUTH_FILE 时使用内存 mock，避免 aircode init 报错
 import lark from "@larksuiteoapi/node-sdk";
+import express from "express";
 
 let EventDB;
 let MsgTable;
@@ -83,16 +84,6 @@ const client = new lark.Client({
   appSecret: FEISHU_APP_SECRET,
   disableTokenCache: false,
 });
-
-console.log(
-  {
-    appId: FEISHU_APP_ID,
-    appSecret: FEISHU_APP_SECRET,
-    disableTokenCache: false,
-  },
-  process.env,
-  "mmmmm",
-);
 
 // 日志辅助函数，请贡献者使用此函数打印关键日志
 function logger(param) {
@@ -278,7 +269,7 @@ async function handleReply(userInput, sessionId, messageId, eventId) {
   return { code: 0 };
 }
 
-export default async function (params, context) {
+async function handleFeishuEvent(params, context = {}) {
   await ensureDB();
   // 如果存在 encrypt 则说明配置了 encrypt key
   if (params.encrypt) {
@@ -357,3 +348,35 @@ export default async function (params, context) {
     code: 2,
   };
 }
+
+// ---------- Express 启动 ----------
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.use(express.json());
+
+// 飞书事件回调：POST 与 Aircode 入参一致
+app.post("/", async (req, res) => {
+  try {
+    const result = await handleFeishuEvent(req.body, {});
+    res.json(result);
+  } catch (err) {
+    logger("handler error", err);
+    res.status(500).json({ code: -1, message: String(err?.message || err) });
+  }
+});
+
+// 自检：GET 请求触发 doctor（context.trigger === "DEBUG"）
+app.get("/", async (_req, res) => {
+  try {
+    const result = await handleFeishuEvent({}, { trigger: "DEBUG" });
+    res.json(result);
+  } catch (err) {
+    logger("doctor error", err);
+    res.status(500).json({ code: -1, message: String(err?.message || err) });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`[CF] 飞书机器人已启动 http://localhost:${PORT}`);
+});
