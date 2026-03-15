@@ -89,6 +89,7 @@ console.log(
     appSecret: FEISHU_APP_SECRET,
     disableTokenCache: false,
   },
+  process.env,
   "mmmmm",
 );
 
