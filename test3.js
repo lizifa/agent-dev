@@ -8,7 +8,8 @@ let MsgTable;
 function createMockTable() {
   const store = [];
   let id = 0;
-  const match = (obj, cond) => Object.keys(cond).every((k) => obj[k] === cond[k]);
+  const match = (obj, cond) =>
+    Object.keys(cond).every((k) => obj[k] === cond[k]);
   return {
     async save(record) {
       const row = { ...record, createdAt: record.createdAt || new Date() };
@@ -39,7 +40,7 @@ function createMockTable() {
               const out = [...filtered].sort(
                 (a, b) =>
                   (desc ? 1 : -1) *
-                  (new Date(b.createdAt) - new Date(a.createdAt))
+                  (new Date(b.createdAt) - new Date(a.createdAt)),
               );
               return out;
             },
@@ -77,6 +78,12 @@ const FEISHU_BOTNAME = "小书包";
 const MAX_CONVERSATION_SIZE = 4096; // 历史会话最大长度（字符），超过则丢弃旧消息
 
 const client = new lark.Client({
+  appId: FEISHU_APP_ID,
+  appSecret: FEISHU_APP_SECRET,
+  disableTokenCache: false,
+});
+
+console.log({
   appId: FEISHU_APP_ID,
   appSecret: FEISHU_APP_SECRET,
   disableTokenCache: false,
@@ -344,4 +351,4 @@ export default async function (params, context) {
   return {
     code: 2,
   };
-};
+}
