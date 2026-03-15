@@ -83,11 +83,14 @@ const client = new lark.Client({
   disableTokenCache: false,
 });
 
-console.log({
-  appId: FEISHU_APP_ID,
-  appSecret: FEISHU_APP_SECRET,
-  disableTokenCache: false,
-});
+console.log(
+  {
+    appId: FEISHU_APP_ID,
+    appSecret: FEISHU_APP_SECRET,
+    disableTokenCache: false,
+  },
+  "mmmmm",
+);
 
 // 日志辅助函数，请贡献者使用此函数打印关键日志
 function logger(param) {
