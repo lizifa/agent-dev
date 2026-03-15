@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 // @version 0.0.11 本地无 AC_AUTH_FILE 时使用内存 mock，避免 aircode init 报错
 import lark from "@larksuiteoapi/node-sdk";
 
