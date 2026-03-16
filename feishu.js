@@ -132,12 +132,17 @@ app.use(express.json());
 
 app.post("/feishu/webhook", (req, res) => {
   try {
-    const body = req.body || {};
-    // 飞书 URL 验证：配置 webhook 时飞书会发带 type + challenge 的请求，必须只返回 { challenge }
-    if (body.type === "url_verification" && body.challenge != null) {
-      return res.json({ challenge: body.challenge });
-    }
-    const message = body.event?.message?.content;
+  const { header, event, challenge } = req.body;
+
+  // 1. 飞书 URL 验证（必须通过）
+  const isUrlVerification =
+    req.body?.type === "url_verification" ||
+    header?.event_type === "url_verification";
+  if (isUrlVerification && challenge != null) {
+    console.log("✅ 飞书验证请求，返回 challenge:", challenge);
+    return res.json({ challenge });
+  }
+    const message = event?.message?.content;
     console.log("群消息:", message);
     res.status(200).json({});
   } catch (e) {
