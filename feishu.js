@@ -34,7 +34,7 @@ app.post("/feishu/webhook", async (req, res) => {
   let body = req.body || {};
   const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
   body = JSON.parse(raw);
-  console.log(body,header,'kkkk');
+  console.log('------',body,'=====',header,'kkkk');
   const { header, event, challenge } = body;
 
   // body =  {
