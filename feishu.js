@@ -34,8 +34,37 @@ app.post("/feishu/webhook", async (req, res) => {
   let body = req.body || {};
   const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
   body = JSON.parse(raw);
-  console.log(body,'kkkk');
+  console.log(body,header,'kkkk');
   const { header, event, challenge } = body;
+
+  // body =  {
+  //   0|feishu  |   schema: '2.0',
+  //   0|feishu  |   header: {
+  //   0|feishu  |     event_id: '3f80c9c774cf6a21bf7ab97ef84dc111',
+  //   0|feishu  |     token: 'YXKk6bE44gVGphuPETsViuklSVhWnJZE',
+  //   0|feishu  |     create_time: '1773675150355',
+  //   0|feishu  |     event_type: 'im.message.receive_v1',
+  //   0|feishu  |     tenant_key: '2ef845fabe8f1652',
+  //   0|feishu  |     app_id: 'cli_a939426a23789cc6'
+  //   0|feishu  |   },
+  //   0|feishu  |   event: {
+  //   0|feishu  |     message: {
+  //   0|feishu  |       chat_id: 'oc_f97f903c40b649491d1981c434a225c9',
+  //   0|feishu  |       chat_type: 'p2p',
+  //   0|feishu  |       content: '{"text":"@_user_1 11"}',
+  //   0|feishu  |       create_time: '1773675150060',
+  //   0|feishu  |       mentions: [Array],
+  //   0|feishu  |       message_id: 'om_x100b54b6661338a8b1076984f82de45',
+  //   0|feishu  |       message_type: 'text',
+  //   0|feishu  |       update_time: '1773675150060'
+  //   0|feishu  |     },
+  //   0|feishu  |     sender: {
+  //   0|feishu  |       sender_id: [Object],
+  //   0|feishu  |       sender_type: 'user',
+  //   0|feishu  |       tenant_key: '2ef845fabe8f1652'
+  //   0|feishu  |     }
+  //   0|feishu  |   }
+  //   0|feishu  | } kkkk
 
   const isUrlVerification =
     body?.type === "url_verification" ||
