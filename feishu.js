@@ -34,7 +34,6 @@ app.post("/feishu/webhook", async (req, res) => {
   let body = req.body || {};
   const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
   body = JSON.parse(raw);
-  console.log('------',body,'=====',header,'kkkk');
   const { header, event, challenge } = body;
 
   // body =  {
@@ -66,9 +65,7 @@ app.post("/feishu/webhook", async (req, res) => {
   //   0|feishu  |   }
   //   0|feishu  | } kkkk
 
-  const isUrlVerification =
-    body?.type === "url_verification" ||
-    header?.event_type === "url_verification";
+  const isUrlVerification = header?.event_type === "url_verification";
   if (isUrlVerification && challenge != null) {
     return res.json({ challenge });
   }
@@ -92,7 +89,6 @@ app.post("/feishu/webhook", async (req, res) => {
     const contentObj =
       typeof content === "string" ? JSON.parse(content) : content;
     userInput = contentObj.text || "";
-    // 剔除 @小书包 标记
     userInput = userInput
       .replace(new RegExp(`@${FEISHU_CONFIG.botName}`, "g"), "")
       .trim();
@@ -105,7 +101,6 @@ app.post("/feishu/webhook", async (req, res) => {
   const isP2p = chat_type === "p2p";
   const isMentioned = mentions?.some((m) => m.name === FEISHU_CONFIG.botName);
   if (!isP2p && !isMentioned) {
-    console.log("ℹ️ 群聊未@机器人，忽略");
     return res.status(200).json({ status: "not_mentioned" });
   }
 
@@ -126,34 +121,34 @@ async function sendFeishuReply(messageId, text) {
   // 1. 获取 tenant_access_token
   const tokenRes = await axios.post(
     "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal",
-    { app_id: FEISHU_CONFIG.appId, app_secret: FEISHU_CONFIG.appSecret },
+    {
+      app_id: FEISHU_CONFIG.appId,
+      app_secret: FEISHU_CONFIG.appSecret,
+    },
   );
   const accessToken = tokenRes.data.tenant_access_token;
   if (!accessToken) throw new Error("获取 access_token 失败");
 
   // 2. 调用回复接口
-  const url = `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/reply`;
-  const res = await axios.post(
-    url,
-    {
-      msg_type: "text",
-      content: JSON.stringify({ text }),
+  const replyUrl = `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/reply`;
+  const replyBody = {
+    msg_type: "text",
+    content: JSON.stringify({ text }),
+  };
+  const replyRes = await axios.post(replyUrl, replyBody, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
     },
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      timeout: 10000,
-    },
-  );
-  return res.data;
+    timeout: 10000,
+  });
+
+  return replyRes.data;
 }
 
 // ========== 修复：监听 0.0.0.0，允许公网访问 ==========
 const PORT = 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 小书包服务运行在 http://0.0.0.0:${PORT}`);
-  console.log(`📎 Webhook 地址: https://xxb.dokichat.club/feishu/webhook`);
 });
 
