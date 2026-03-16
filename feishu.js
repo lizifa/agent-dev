@@ -12,7 +12,6 @@ app.use(express.json());
 //   apiKey: process.env.OPENAI_API_KEY,
 // });
 
-// 飞书应用配置（Encrypt Key 在 事件与回调 > 加密策略 中获取）
 const FEISHU_CONFIG = {
   appId: process.env.FEISHU_APP_ID,
   appSecret: process.env.FEISHU_APP_SECRET,
@@ -21,7 +20,6 @@ const FEISHU_CONFIG = {
   botName: "小书包", // 明确机器人名称
 };
 
-/** 飞书加密请求体解密（AES-256-CBC，密钥为 SHA256(encrypt_key)） */
 function decryptFeishuBody(encryptBase64, encryptKey) {
   if (!encryptKey) throw new Error("未配置 FEISHU_ENCRYPT_KEY");
   const key = crypto.createHash("sha256").update(encryptKey).digest();
@@ -32,52 +30,29 @@ function decryptFeishuBody(encryptBase64, encryptKey) {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
 }
 
-// ========== 新增：全局日志，排查请求是否到达 ==========
-app.use((req, res, next) => {
-  console.log(`\n[${new Date().toLocaleString()}] ${req.method} ${req.path}`);
-  console.log("请求体:", JSON.stringify(req.body, null, 2));
-  next();
-});
-
 app.post("/feishu/webhook", async (req, res) => {
   let body = req.body || {};
-  // 若开启了加密策略，请求体为 { encrypt: "..." }，需先解密再解析
-  if (body.encrypt != null && typeof body.encrypt === "string" && !body.type && !body.challenge) {
-    if (!FEISHU_CONFIG.encryptKey) {
-      console.error("❌ 请求已加密，请在 .env 中配置 FEISHU_ENCRYPT_KEY（飞书后台 事件与回调 > 加密策略）");
-      return res.status(200).json({});
-    }
-    try {
-      const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
-      body = JSON.parse(raw);
-    } catch (e) {
-      console.error("❌ 解密失败:", e.message);
-      return res.status(200).json({});
-    }
-  }
-
+  const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
+  body = JSON.parse(raw);
+  console.log(body,'kkkk');
   const { header, event, challenge } = body;
 
-  // 1. 飞书 URL 验证（必须通过）
   const isUrlVerification =
     body?.type === "url_verification" ||
     header?.event_type === "url_verification";
   if (isUrlVerification && challenge != null) {
-    console.log("✅ 飞书验证请求，返回 challenge:", challenge);
     return res.json({ challenge });
   }
 
   // 2. 只处理消息事件
   const msgEventType = header?.event_type;
   if (msgEventType !== "im.message.receive_v1") {
-    console.log("ℹ️ 非消息事件，忽略:", msgEventType);
     return res.status(200).json({ status: "ignored" });
   }
 
   // 3. 解析消息核心数据
   const message = event?.message;
   if (!message) {
-    console.log("⚠️ 无 message 字段");
     return res.status(200).json({ status: "no_message" });
   }
 
