@@ -1,4 +1,5 @@
 import "dotenv/config";
+import crypto from "crypto";
 import express from "express";
 import axios from "axios";
 import { OpenAI } from "openai";
@@ -11,13 +12,25 @@ app.use(express.json());
 //   apiKey: process.env.OPENAI_API_KEY,
 // });
 
-// 飞书应用配置
+// 飞书应用配置（Encrypt Key 在 事件与回调 > 加密策略 中获取）
 const FEISHU_CONFIG = {
   appId: process.env.FEISHU_APP_ID,
   appSecret: process.env.FEISHU_APP_SECRET,
   verificationToken: process.env.FEISHU_VERIFICATION_TOKEN,
+  encryptKey: process.env.FEISHU_ENCRYPT_KEY,
   botName: "小书包", // 明确机器人名称
 };
+
+/** 飞书加密请求体解密（AES-256-CBC，密钥为 SHA256(encrypt_key)） */
+function decryptFeishuBody(encryptBase64, encryptKey) {
+  if (!encryptKey) throw new Error("未配置 FEISHU_ENCRYPT_KEY");
+  const key = crypto.createHash("sha256").update(encryptKey).digest();
+  const buf = Buffer.from(encryptBase64, "base64");
+  const iv = buf.subarray(0, 16);
+  const ciphertext = buf.subarray(16);
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+}
 
 // ========== 新增：全局日志，排查请求是否到达 ==========
 app.use((req, res, next) => {
@@ -27,11 +40,27 @@ app.use((req, res, next) => {
 });
 
 app.post("/feishu/webhook", async (req, res) => {
-  const { header, event, challenge } = req.body;
+  let body = req.body || {};
+  // 若开启了加密策略，请求体为 { encrypt: "..." }，需先解密再解析
+  if (body.encrypt != null && typeof body.encrypt === "string" && !body.type && !body.challenge) {
+    if (!FEISHU_CONFIG.encryptKey) {
+      console.error("❌ 请求已加密，请在 .env 中配置 FEISHU_ENCRYPT_KEY（飞书后台 事件与回调 > 加密策略）");
+      return res.status(200).json({});
+    }
+    try {
+      const raw = decryptFeishuBody(body.encrypt, FEISHU_CONFIG.encryptKey);
+      body = JSON.parse(raw);
+    } catch (e) {
+      console.error("❌ 解密失败:", e.message);
+      return res.status(200).json({});
+    }
+  }
+
+  const { header, event, challenge } = body;
 
   // 1. 飞书 URL 验证（必须通过）
   const isUrlVerification =
-    req.body?.type === "url_verification" ||
+    body?.type === "url_verification" ||
     header?.event_type === "url_verification";
   if (isUrlVerification && challenge != null) {
     console.log("✅ 飞书验证请求，返回 challenge:", challenge);
