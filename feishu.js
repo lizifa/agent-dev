@@ -103,6 +103,7 @@ app.post("/feishu/webhook", async (req, res) => {
 
   const { message_id, content, mentions, chat_type } = message;
   let userInput;
+  console.log(message,'message');
   try {
     const contentObj = typeof content === "string" ? JSON.parse(content) : content;
     userInput = (contentObj?.text || "")
