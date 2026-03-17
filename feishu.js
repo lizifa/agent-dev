@@ -30,6 +30,20 @@ function decryptFeishuBody(encryptBase64, encryptKey) {
   ]).toString("utf8");
 }
 
+// 事件去重：飞书可能重复推送，用 event_id 避免同一条消息回复两次
+const PROCESSED_EVENT_TTL_MS = 8 * 60 * 60 * 1000; // 8 小时
+const processedEventIds = new Map(); // event_id -> 写入时间
+
+function addProcessedEventId(eventId) {
+  const now = Date.now();
+  if (processedEventIds.size > 5000) {
+    for (const [id, t] of processedEventIds.entries()) {
+      if (now - t > PROCESSED_EVENT_TTL_MS) processedEventIds.delete(id);
+    }
+  }
+  processedEventIds.set(eventId, now);
+}
+
 /** 若请求体为加密格式则解密并返回解析后的 body，否则返回原 body */
 function parseWebhookBody(body) {
   const raw = body || {};
@@ -100,6 +114,15 @@ app.post("/feishu/webhook", async (req, res) => {
 
   if (header?.event_type !== "im.message.receive_v1") {
     return res.status(200).json({ status: "ignored" });
+  }
+
+  // 飞书可能重复推送同一事件（重试、重连等），用 event_id 去重，避免回复两条
+  const eventId = header?.event_id;
+  if (eventId && processedEventIds.has(eventId)) {
+    return res.status(200).json({ status: "duplicate" });
+  }
+  if (eventId) {
+    addProcessedEventId(eventId);
   }
 
   const message = event?.message;
