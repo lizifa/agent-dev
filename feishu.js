@@ -102,12 +102,15 @@ app.post("/feishu/webhook", async (req, res) => {
   if (!message) return res.status(200).json({ status: "no_message" });
 
   const { message_id, content, mentions, chat_type } = message;
-  let userInput;
-  console.log(message,'message');
+  let userInput
   try {
     const contentObj = typeof content === "string" ? JSON.parse(content) : content;
-    userInput = (contentObj?.text || "")
+    const rawText = contentObj?.text || "";
+    // 移除飞书 @ 占位符（如 @_user_1）及 @机器人名，得到用户真实输入
+    userInput = rawText
+      .replace(/@_\w+/g, "")
       .replace(new RegExp(`@${FEISHU_CONFIG.botName}`, "g"), "")
+      .replace(/\s+/g, " ")
       .trim();
   } catch {
     return res.status(200).json({ status: "parse_error" });
