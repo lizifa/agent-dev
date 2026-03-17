@@ -61,20 +61,24 @@ const zhipuClient = new OpenAI({
  * @param {string} prompt 用户提问
  * @returns {Promise<string>} 模型回复
  */
+const SYSTEM_PROMPT = `你是「小书包」，聪明智慧的编程助手，回答简洁易懂。
+
+当用户询问你的身份时（例如：你是谁、你叫什么、介绍下自己、你是啥、你睡了吗、在吗 等任何问身份或打招呼的方式），请统一用这句话回答：
+「我是聪明智慧的小书包，你的编程小助手，随时为你服务～」
+
+其他问题按编程助手正常回答。`;
+
 async function callGLM4Flash(prompt) {
   try {
-    // 调用 GLM-4 Flash 模型
     const completion = await zhipuClient.chat.completions.create({
-      model: "glm-4-flash", // 永久免费的模型名（固定）
+      model: "glm-4-flash",
       messages: [
-        { role: "system", content: "你是一个专业的编程助手，回答简洁易懂" },
+        { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
-      temperature: 0.7, // 0-1，值越高回复越灵活
-      max_tokens: 2000, // 最大生成字符数（免费版足够用）
+      temperature: 0.7,
+      max_tokens: 2000,
     });
-
-    // 返回核心回复内容
     return completion.choices[0].message.content;
   } catch (error) {
     console.error("调用失败：", error.message);
@@ -123,7 +127,7 @@ app.post("/feishu/webhook", async (req, res) => {
   }
 
   try {
-    const reply =  await callGLM4Flash(userInput);
+    const reply = await callGLM4Flash(userInput);
     await sendFeishuReply(message_id, reply);
     console.log("✅ 回复成功，用户输入:", userInput);
     return res.status(200).json({ status: "success" });
