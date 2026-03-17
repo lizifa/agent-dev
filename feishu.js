@@ -2,6 +2,7 @@ import "dotenv/config";
 import crypto from "crypto";
 import express from "express";
 import axios from "axios";
+import OpenAI from "openai";
 
 const app = express();
 app.use(express.json());
